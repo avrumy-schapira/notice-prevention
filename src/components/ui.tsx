@@ -87,12 +87,20 @@ export const Table = ({ cols, children }: { cols: Col[]; children: ReactNode }) 
   </table>
 )
 export const Tr = ({ children, onClick, className = '' }: { children: ReactNode; onClick?: () => void; className?: string }) => (
-  <tr onClick={onClick} className={`h-12 ${onClick ? 'cursor-pointer hover:bg-zinc-50' : ''} ${className}`}>{children}</tr>
+  <tr onClick={onClick} className={`h-14 ${onClick ? 'cursor-pointer hover:bg-zinc-50' : ''} ${className}`}>{children}</tr>
 )
 export const Td = ({ children, className = '', right }: { children?: ReactNode; className?: string; right?: boolean }) => (
   <td className={`truncate px-4 ${right ? 'text-right' : ''} ${className}`}>{children}</td>
 )
-export const Sub = ({ children }: { children: ReactNode }) => <div className="truncate text-xs text-zinc-500">{children}</div>
+export const Sub = ({ children }: { children: ReactNode }) => <div className="mt-0.5 truncate text-xs text-zinc-500">{children}</div>
+export const Main = ({ children }: { children: ReactNode }) => <div className="truncate font-medium text-zinc-900">{children}</div>
+export const stageLabel = (s: string | null | undefined) => (s === 'extension' ? 'Extension' : 'Return')
+export const days = (n: number | null) => (n == null ? '' : n === 0 ? 'Today' : n === 1 ? '1 day' : `${n} days`)
+export const Dot = ({ tone, children }: { tone: 'red' | 'amber' | 'green' | 'zinc' | 'blue'; children: ReactNode }) => (
+  <span className="inline-flex items-center gap-2 text-sm text-zinc-700">
+    <span className={`h-2 w-2 shrink-0 rounded-full ${{ red: 'bg-red-500', amber: 'bg-amber-500', green: 'bg-emerald-500', zinc: 'bg-zinc-300', blue: 'bg-blue-500' }[tone]}`} />{children}
+  </span>
+)
 
 export const Button = ({ children, onClick, variant = 'secondary', disabled, title }: {
   children: ReactNode; onClick?: () => void; variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; disabled?: boolean; title?: string; size?: string

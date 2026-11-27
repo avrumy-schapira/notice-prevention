@@ -100,10 +100,13 @@ Deno.serve(async (req) => {
     const items = (await kall("/WorkItems?$filter=contains(WorkType,'Tax:')")).filter((w: any) => !/amended|ptet/i.test((w.WorkTemplateTile ?? '') + ' ' + (w.Title ?? '')))
     const { data: prev } = await db.from('karbon_work_items').select('karbon_key, stage, first_seen_at')
     const prevMap = new Map((prev ?? []).map((r) => [r.karbon_key, r]))
-    const { data: eIds } = await db.from('entities').select('id, karbon_key, return_type')
+    const eIds: any[] = []
+    for (let f = 0; ; f += 1000) { const { data } = await db.from('entities').select('id, karbon_key, return_type').range(f, f + 999); eIds.push(...(data ?? [])); if (!data || data.length < 1000) break }
     const eMap = new Map((eIds ?? []).map((r) => [r.karbon_key, r]))
     const rt = (t: string) => /1120S|S-Corp/i.test(t) ? '1120-S' : /1120/.test(t) ? '1120' : /1065/.test(t) ? '1065' : /1041/.test(t) ? '1041' : /990/.test(t) ? '990' : /1040/.test(t) ? '1040' : null
-    const keep = items.filter((w: any) => w.PrimaryStatus !== 'Completed' && (EXT.includes(w.SecondaryStatus) || RTN.includes(w.SecondaryStatus) || prevMap.has(w.WorkItemKey)))
+    // Enters only at the send-to-client step; after that it stays until Completed
+    const START = ['Send Return to Client', 'Send Rtn to Client', 'Ext - Send to Client', 'Send Ext to Client']
+    const keep = items.filter((w: any) => w.PrimaryStatus !== 'Completed' && (START.includes(w.SecondaryStatus) || prevMap.has(w.WorkItemKey)))
     const wRows = keep.map((w: any) => {
       const years = (w.Title ?? '').match(/20\d\d/g)
       const p = prevMap.get(w.WorkItemKey)

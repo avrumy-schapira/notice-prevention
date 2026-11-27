@@ -1,15 +1,22 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ArrowRight } from 'lucide-react'
 import { useFilings } from '../lib/useFilings'
 import { applyFilters, emptyFilters, Filters } from '../components/Filters'
-import { Badge, Card, Empty, Loading, PageHeader, StageBadge, StatusBadge, Sub, Table, Td, Tr } from '../components/ui'
+import { Card, Dot, Empty, Loading, Main, PageHeader, Sub, Table, Td, Tr, days, stageLabel } from '../components/ui'
 import { date, daysSince } from '../lib/format'
 import { yearPath, type Filing, type FilingStatus } from '../lib/types'
 
 const SHOWN: FilingStatus[] = ['emailed_waiting', 'client_confirmed', 'client_modified_ach', 'client_modified_method']
 const needsUltraTax = (f: Filing) => f.payment_lines.some((l) => l.response === 'modified' && l.new_method === 'efw' && !l.entered_in_ultratax_at)
-// Top: modified and UltraTax not updated -> waiting longest -> ready to file
 const rank = (f: Filing) => (needsUltraTax(f) || f.status === 'client_modified_method' ? 0 : f.status === 'emailed_waiting' ? 1 : 2)
+
+function NextStep({ f }: { f: Filing }) {
+  if (needsUltraTax(f)) return <Dot tone="red">Enter new bank in UltraTax</Dot>
+  if (f.status === 'client_modified_method') return <Dot tone="amber">Ask preparer about new method</Dot>
+  if (f.status === 'client_confirmed') return <Dot tone="green">Ready: final pull and file</Dot>
+  return <Dot tone="zinc">Waiting for the client</Dot>
+}
 
 export function PendingApprovals() {
   const nav = useNavigate()
@@ -19,26 +26,20 @@ export function PendingApprovals() {
 
   return (
     <>
-      <PageHeader title="Client approvals" sub="Emails sent before filing, and whether the client answered" />
+      <PageHeader title="Client approvals" sub="Emails sent before filing, and whether the client answered. What needs you is on top." />
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
       <Filters filings={filings} value={flt} onChange={setFlt} statuses={SHOWN} />
       <Card>
-        {loading ? <Loading /> : !rows.length ? <Empty title="Nothing pending" /> : (
-          <Table cols={[['Client', '26%'], ['Year', '80px'], ['Type', '120px'], ['Status', '190px'], ['Emailed', '130px'], ['Waiting', '90px'], ['Next step']]}>
+        {loading ? <Loading /> : !rows.length ? <Empty title="Nothing waiting on clients" /> : (
+          <Table cols={[['Client'], ['Year', '150px'], ['Emailed', '130px'], ['Waiting', '110px', 'right'], ['Next step', '270px'], ['', '90px', 'right']]}>
             {rows.map((f) => (
               <Tr key={f.id} onClick={() => nav(yearPath(f))}>
-                <Td><div className="truncate font-medium">{f.entities.name}</div><Sub>{f.entities.client_groups?.name}</Sub></Td>
-                <Td className="tabular-nums">{f.tax_year}</Td>
-                <Td><StageBadge stage={f.stage} /></Td>
-                <Td><StatusBadge status={f.status} /></Td>
+                <Td><Main>{f.entities.name}</Main><Sub>{f.entities.client_groups?.name ?? 'Not in a client group'}</Sub></Td>
+                <Td><Main>{f.tax_year}</Main><Sub>{stageLabel(f.stage)}</Sub></Td>
                 <Td className="text-zinc-600">{date(f.email_sent_at)}</Td>
-                <Td className="tabular-nums text-zinc-600">{f.status === 'emailed_waiting' ? `${daysSince(f.email_sent_at)} days` : '—'}</Td>
-                <Td>
-                  {needsUltraTax(f) ? <Badge tone="red">Enter new bank in UltraTax</Badge>
-                    : f.status === 'client_modified_method' ? <Badge tone="amber">Karbon comment to preparer</Badge>
-                      : f.status === 'client_confirmed' ? <Badge tone="green">Final pull → file</Badge>
-                        : <span className="text-zinc-400">Wait for client</span>}
-                </Td>
+                <Td right className="tabular-nums text-zinc-600">{days(daysSince(f.email_sent_at))}</Td>
+                <Td><NextStep f={f} /></Td>
+                <Td right><span className="inline-flex items-center gap-1 text-sm font-medium text-zinc-900">Open<ArrowRight className="h-4 w-4" /></span></Td>
               </Tr>
             ))}
           </Table>

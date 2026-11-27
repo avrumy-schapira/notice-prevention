@@ -17,19 +17,22 @@ Client group → Entity → Filing (entity + tax year + Extension/Return) → Pa
 - Preparer approval is not tracked per client response; only the "Preparer approved in Karbon" checkbox on flags (preparer name, who, when).
 - NJ 80% check dropped (user decision 11/25).
 
-Schema: `supabase/migrations/0001_schema.sql`
+Schema: `supabase/migrations/0001_schema.sql` + `0002_grants.sql` (both applied to Supabase project rowhrgwrdxdfuaoxwjxo)
+Sign-in: email link (Google sign-in later). Supabase Site URL = https://notice-prevention.avrumy.workers.dev
 
 ## Secrets (never in code or chat)
 - Supabase Edge Function secrets: `KARBON_BEARER_TOKEN`, `KARBON_ACCESS_KEY` (saved)
 - Cloudflare build variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`
 
 ## Built
+- Karbon sync: Edge Function `karbon-sync` (supabase/functions/karbon-sync). Groups from /ClientGroups (+ Members per group), entities = group members (+ active ones with a Client Identifier). Preparer = ClientManager ?? ClientOwner (entity, else group). 169 groups / 1,187 entities on 11/27.
+- Site layout: left sidebar; Clients → group → entity (tax years) → year (Extension / Return tabs)
 - Database schema with roles (admin / manager / staff) and row-level security
 - Pages: Admin workload, Pending approvals, Payment confirmations, Client database, entity page, filing page
 - Mark as filed, "Preparer approved in Karbon" on flags, payment check-offs, activity log
 
 ## Not built yet
-1. Karbon sync (nightly + Sync now) → client groups, entities
+1. Nightly Karbon sync (the Sync Karbon button on Clients works now)
 2. Data mining import → prior_year_amounts
 3. Agent connection (Pull / Enter in UltraTax / Final pull) → payment lines, flags, diagnostics
 4. Checks engine (Check Rules.csv)

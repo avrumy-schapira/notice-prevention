@@ -12,7 +12,6 @@ import { YearPage } from './pages/YearPage'
 import { Workload } from './pages/Workload'
 import { PendingApprovals } from './pages/PendingApprovals'
 import { PaymentConfirmations } from './pages/PaymentConfirmations'
-import { SearchPage } from './pages/SearchPage'
 import { UpcomingPayments } from './pages/UpcomingPayments'
 import { Settings } from './pages/Settings'
 
@@ -46,7 +45,6 @@ function Routed() {
         {profile.role === 'admin' && <Route path="/settings" element={<Settings />} />}
         <Route path="/approvals" element={<PendingApprovals />} />
         <Route path="/payments" element={<PaymentConfirmations />} />
-        <Route path="/search" element={<SearchPage />} />
         <Route path="*" element={<Navigate to="/clients" replace />} />
       </Route>
     </Routes>

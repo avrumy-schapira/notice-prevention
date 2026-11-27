@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { date, money } from '../lib/format'
 import { markPayment, paymentState, WHO, type PlanPayment } from '../components/Plans'
-import { Button, Card, Empty, Loading, PageHeader, SearchBox, SectionTitle, Select, Table, Td } from '../components/ui'
+import { Button, Card, Empty, Loading, PageHeader, SearchBox, SectionTitle, Select, Sub, Table, Td, Tr } from '../components/ui'
 
 type Row = PlanPayment & { payment_plans: { id: string; department: string; tax_year: number; entity_id: string; bank_accounts: { last4: string } | null; entities: { name: string; client_groups: { name: string } | null } } }
 
@@ -38,23 +38,22 @@ export function UpcomingPayments() {
   const act = async (p: Row, s: 'made' | 'missed') => { if (await markPayment(p, s, session?.user.id)) load() }
 
   const table = (list: Row[]) => (
-    <Table head={['Client', 'Department', 'Amount', 'Date', 'Who pays', 'From', 'Status', '']}>
+    <Table cols={[['Client'], ['Department', '140px'], ['Amount', '120px', 'right'], ['Date', '130px'], ['Who pays', '140px'], ['Status', '110px'], ['', '230px', 'right']]}>
       {list.map((r) => (
-        <tr key={r.id} className="hover:bg-zinc-50">
-          <Td><Link to={`/entity/${r.payment_plans.entity_id}?tab=plans`} className="font-medium hover:underline">{r.payment_plans.entities.name}</Link><div className="text-xs text-zinc-500">{r.payment_plans.entities.client_groups?.name}</div></Td>
-          <Td>{r.payment_plans.department} <span className="text-xs text-zinc-400">{r.payment_plans.tax_year}</span></Td>
-          <Td className="font-medium tabular-nums">{money(r.amount)}</Td>
+        <Tr key={r.id}>
+          <Td><Link to={`/entity/${r.payment_plans.entity_id}?tab=payments`} className="block truncate font-medium hover:underline">{r.payment_plans.entities.name}</Link><Sub>{r.payment_plans.entities.client_groups?.name}</Sub></Td>
+          <Td><div className="truncate">{r.payment_plans.department}</div><Sub>{r.payment_plans.tax_year}</Sub></Td>
+          <Td right className="font-medium tabular-nums">{money(r.amount)}</Td>
           <Td className="tabular-nums">{date(r.due_date)}</Td>
-          <Td>{WHO[r.who_pays]}</Td>
-          <Td className="tabular-nums text-zinc-600">{r.payment_plans.bank_accounts ? `•••• ${r.payment_plans.bank_accounts.last4}` : '—'}</Td>
+          <Td><div>{WHO[r.who_pays]}</div><Sub>{r.payment_plans.bank_accounts ? `from •••• ${r.payment_plans.bank_accounts.last4}` : 'no bank set'}</Sub></Td>
           <Td>{paymentState(r)}</Td>
-          <Td className="whitespace-nowrap text-right">
-            <span className="inline-flex gap-1">
-              <Button size="sm" variant="primary" onClick={() => act(r, 'made')}><Check className="h-3.5 w-3.5" />{r.who_pays === 'client' ? 'Confirmation received' : 'Made'}</Button>
-              {r.due_date <= today && <Button size="sm" variant="ghost" onClick={() => act(r, 'missed')}><X className="h-3.5 w-3.5" />Missed</Button>}
+          <Td right className="overflow-visible">
+            <span className="inline-flex gap-2">
+              {r.due_date <= today && <Button onClick={() => act(r, 'missed')}><X />Missed</Button>}
+              <Button variant="primary" onClick={() => act(r, 'made')}><Check />{r.who_pays === 'client' ? 'Got confirmation' : 'Made'}</Button>
             </span>
           </Td>
-        </tr>
+        </Tr>
       ))}
     </Table>
   )
@@ -63,14 +62,14 @@ export function UpcomingPayments() {
     <>
       <PageHeader title="Upcoming payments" sub="Estimated payments to be made. Richelle marks each one complete; client payments count once we get his confirmation." />
       <div className="mb-6 flex flex-wrap items-center gap-2">
-        <SearchBox value={q} onChange={setQ} placeholder="Search client" />
-        <Select value={who} onChange={setWho}><option value="">Anyone pays</option><option value="richelle">Richelle pays</option><option value="client">Client pays</option></Select>
-        <Select value={dept} onChange={setDept}><option value="">All departments</option>{depts.map((d) => <option key={d}>{d}</option>)}</Select>
-        <Select value={days} onChange={setDays}><option value="7">Next 7 days</option><option value="30">Next 30 days</option><option value="90">Next 90 days</option><option value="400">Rest of the year</option></Select>
+        <SearchBox value={q} onChange={setQ} placeholder="Search client" width="w-64" />
+        <Select value={who} onChange={setWho} width="w-44"><option value="">Anyone pays</option><option value="richelle">Richelle pays</option><option value="client">Client pays</option></Select>
+        <Select value={dept} onChange={setDept} width="w-48"><option value="">All departments</option>{depts.map((d) => <option key={d}>{d}</option>)}</Select>
+        <Select value={days} onChange={setDays} width="w-44"><option value="7">Next 7 days</option><option value="30">Next 30 days</option><option value="90">Next 90 days</option><option value="400">Rest of the year</option></Select>
       </div>
       {!rows ? <Card><Loading /></Card> : !filtered.length ? <Card><Empty title="No payments due">Set up payment plans on a client’s Payment plans tab.</Empty></Card> : (
         <div className="space-y-8">
-          {overdue.length > 0 && <section><SectionTitle>Not done on time</SectionTitle><Card className="border-red-200">{table(overdue)}</Card></section>}
+          {overdue.length > 0 && <section><SectionTitle>Not done on time</SectionTitle><Card>{table(overdue)}</Card></section>}
           {dueToday.length > 0 && <section><SectionTitle>Due today</SectionTitle><Card>{table(dueToday)}</Card></section>}
           {upcoming.length > 0 && <section><SectionTitle>Coming up</SectionTitle><Card>{table(upcoming)}</Card></section>}
         </div>

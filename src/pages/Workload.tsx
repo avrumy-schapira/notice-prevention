@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { syncKarbon } from '../lib/karbon'
 import { applyFilters, emptyFilters, Filters } from '../components/Filters'
-import { Badge, Button, Card, Loading, PageHeader, Table, Td } from '../components/ui'
+import { Button, Card, Loading, PageHeader, StageBadge, Sub, Table, Td, Tr } from '../components/ui'
 import { date, daysSince, person } from '../lib/format'
 import { yearPath, type Filing, type FilingStatus } from '../lib/types'
 
@@ -64,48 +64,50 @@ export function Workload() {
   return (
     <>
       <PageHeader title="Work" sub="Returns to check, email and file, by step. Oldest first in each step."
-        right={<Button onClick={sync} disabled={syncing}><RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />Refresh from Karbon</Button>} />
+        right={<Button onClick={sync} disabled={syncing}><RefreshCw className={syncing ? 'animate-spin' : ''} />Refresh from Karbon</Button>} />
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-      <Filters filings={filings} value={f} onChange={setF} />
+      <Filters filings={filings} value={f} onChange={setF} hideStatus />
 
       {loading || !work ? <Card><Loading /></Card> : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {STEPS.map((step) => {
             const list = stepRows(step.statuses)
             const karbon = step.n === 1 ? newWork : []
             const count = list.length + karbon.length
             return (
               <section key={step.n}>
-                <div className="mb-2 flex items-center gap-3">
-                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${count ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-400'}`}>{step.n}</span>
-                  <h2 className={`text-sm font-semibold ${count ? 'text-zinc-900' : 'text-zinc-400'}`}>{step.title}</h2>
-                  <span className="text-sm text-zinc-400">{count}</span>
-                  <span className="ml-auto text-xs text-zinc-500">{step.next}</span>
+                <div className="mb-3 flex h-9 items-center gap-3">
+                  <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${count ? 'bg-zinc-900 text-white' : 'bg-zinc-200 text-zinc-500'}`}>{step.n}</span>
+                  <h2 className={`text-base font-semibold ${count ? 'text-zinc-900' : 'text-zinc-400'}`}>{step.title}</h2>
+                  <span className="text-sm tabular-nums text-zinc-400">{count}</span>
+                  <span className="ml-auto text-sm text-zinc-500">{step.next}</span>
                 </div>
                 {count === 0 ? null : (
                   <Card>
-                    <Table head={['Client', 'Year', 'Type', 'Status', 'Since', 'Preparer', '']}>
+                    <Table cols={[['Client', '28%'], ['Year', '80px'], ['Type', '120px'], ['Status'], ['Since', '130px'], ['Waiting', '90px'], ['Preparer', '120px'], ['', '96px', 'right']]}>
                       {karbon.map((w) => (
-                        <tr key={w.karbon_key} className="bg-blue-50/40">
-                          <Td><div className="font-medium">{w.entities?.name ?? <span className="text-red-600">Not matched to a client</span>}</div><div className="text-xs text-zinc-500">{w.entities?.client_groups?.name}</div></Td>
+                        <Tr key={w.karbon_key}>
+                          <Td><div className="truncate font-medium">{w.entities?.name ?? <span className="text-red-600">Not matched to a client</span>}</div><Sub>{w.entities?.client_groups?.name}</Sub></Td>
                           <Td className="tabular-nums">{w.tax_year ?? '—'}</Td>
-                          <Td><Badge tone={w.stage === 'extension' ? 'violet' : 'blue'}>{w.stage === 'extension' ? 'Extension' : 'Return'}</Badge></Td>
-                          <Td><div className="flex items-center gap-1.5 text-xs text-zinc-600"><FileText className="h-3.5 w-3.5 text-zinc-400" />New from Karbon · {w.secondary_status ?? w.primary_status}</div></Td>
+                          <Td><StageBadge stage={w.stage} /></Td>
+                          <Td className="text-zinc-600"><FileText className="mr-1.5 inline h-4 w-4 align-[-3px] text-zinc-400" />New · {w.secondary_status ?? w.primary_status}</Td>
                           <Td className="text-zinc-600">{date(w.first_seen_at)}</Td>
+                          <Td className="tabular-nums text-zinc-600">{daysSince(w.first_seen_at)}d</Td>
                           <Td className="text-zinc-400">—</Td>
-                          <Td className="text-right">{isAdmin && w.entity_id && w.tax_year ? <Button size="sm" variant="primary" onClick={() => open(w)}>Open</Button> : null}</Td>
-                        </tr>
+                          <Td right className="overflow-visible">{isAdmin && w.entity_id && w.tax_year ? <Button variant="primary" onClick={() => open(w)}>Open</Button> : null}</Td>
+                        </Tr>
                       ))}
                       {list.map((x) => (
-                        <tr key={x.id} onClick={() => nav(yearPath(x))} className="cursor-pointer hover:bg-zinc-50">
-                          <Td><div className="font-medium">{x.entities.name}</div><div className="text-xs text-zinc-500">{x.entities.client_groups?.name}</div></Td>
+                        <Tr key={x.id} onClick={() => nav(yearPath(x))}>
+                          <Td><div className="truncate font-medium">{x.entities.name}</div><Sub>{x.entities.client_groups?.name}</Sub></Td>
                           <Td className="tabular-nums">{x.tax_year}</Td>
-                          <Td><Badge tone={x.stage === 'extension' ? 'violet' : 'blue'}>{x.stage === 'extension' ? 'Extension' : 'Return'}</Badge></Td>
-                          <Td className="text-xs text-zinc-600">{x.status === 'client_modified_ach' ? 'Changed bank' : x.status === 'client_modified_method' ? 'Changed payment method' : x.status === 'not_started' ? 'Opened, not pulled' : '—'}</Td>
-                          <Td className="text-zinc-600">{since(x) ? `${date(since(x))}${x.status === 'emailed_waiting' ? ` · ${daysSince(x.email_sent_at)} days` : ''}` : '—'}</Td>
+                          <Td><StageBadge stage={x.stage} /></Td>
+                          <Td className="text-zinc-600">{x.status === 'client_modified_ach' ? 'Changed bank' : x.status === 'client_modified_method' ? 'Changed payment method' : x.status === 'not_started' ? 'Opened, not pulled' : '—'}</Td>
+                          <Td className="text-zinc-600">{date(since(x))}</Td>
+                          <Td className="tabular-nums text-zinc-600">{since(x) ? `${daysSince(since(x))}d` : '—'}</Td>
                           <Td className="text-zinc-600">{person(x.entities.assigned_preparer)}</Td>
                           <Td />
-                        </tr>
+                        </Tr>
                       ))}
                     </Table>
                   </Card>

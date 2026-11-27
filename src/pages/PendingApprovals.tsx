@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useFilings } from '../lib/useFilings'
 import { applyFilters, emptyFilters, Filters } from '../components/Filters'
-import { Badge, Card, Empty, Loading, PageHeader, StatusBadge, Table, Td } from '../components/ui'
+import { Badge, Card, Empty, Loading, PageHeader, StageBadge, StatusBadge, Sub, Table, Td, Tr } from '../components/ui'
 import { date, daysSince } from '../lib/format'
 import { yearPath, type Filing, type FilingStatus } from '../lib/types'
 
@@ -24,12 +24,12 @@ export function PendingApprovals() {
       <Filters filings={filings} value={flt} onChange={setFlt} statuses={SHOWN} />
       <Card>
         {loading ? <Loading /> : !rows.length ? <Empty title="Nothing pending" /> : (
-          <Table head={['Client', 'Year', 'Stage', 'Status', 'Emailed', 'Waiting', 'Next step']}>
+          <Table cols={[['Client', '26%'], ['Year', '80px'], ['Type', '120px'], ['Status', '190px'], ['Emailed', '130px'], ['Waiting', '90px'], ['Next step']]}>
             {rows.map((f) => (
-              <tr key={f.id} onClick={() => nav(yearPath(f))} className="cursor-pointer hover:bg-zinc-50">
-                <Td><div className="font-medium">{f.entities.name}</div><div className="text-xs text-zinc-500">{f.entities.client_groups?.name}</div></Td>
+              <Tr key={f.id} onClick={() => nav(yearPath(f))}>
+                <Td><div className="truncate font-medium">{f.entities.name}</div><Sub>{f.entities.client_groups?.name}</Sub></Td>
                 <Td className="tabular-nums">{f.tax_year}</Td>
-                <Td className="capitalize">{f.stage}</Td>
+                <Td><StageBadge stage={f.stage} /></Td>
                 <Td><StatusBadge status={f.status} /></Td>
                 <Td className="text-zinc-600">{date(f.email_sent_at)}</Td>
                 <Td className="tabular-nums text-zinc-600">{f.status === 'emailed_waiting' ? `${daysSince(f.email_sent_at)} days` : '—'}</Td>
@@ -39,7 +39,7 @@ export function PendingApprovals() {
                       : f.status === 'client_confirmed' ? <Badge tone="green">Final pull → file</Badge>
                         : <span className="text-zinc-400">Wait for client</span>}
                 </Td>
-              </tr>
+              </Tr>
             ))}
           </Table>
         )}

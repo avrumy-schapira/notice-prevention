@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useFilings } from '../lib/useFilings'
 import { supabase } from '../lib/supabase'
 import { applyFilters, emptyFilters, Filters } from '../components/Filters'
-import { Badge, Button, Card, Empty, Loading, PageHeader, Table, Td } from '../components/ui'
+import { Badge, Button, Card, Empty, Loading, PageHeader, Sub, Table, Td, Tr } from '../components/ui'
 import { date, method, money } from '../lib/format'
 import { yearPath, type Filing, type PaymentLine } from '../lib/types'
 
@@ -37,22 +37,22 @@ export function PaymentConfirmations() {
       <Filters filings={filings} value={flt} onChange={setFlt} showPayDate />
       <Card>
         {loading ? <Loading /> : !rows.length ? <Empty title="All payments verified" /> : (
-          <Table head={['Client', 'Department', 'Amount', 'Method', 'Date', 'Client says', '']}>
+          <Table cols={[['Client'], ['Department', '16%'], ['Amount', '130px', 'right'], ['Method', '170px'], ['Date', '130px'], ['Client says', '120px'], ['', '330px', 'right']]}>
             {rows.map(({ filing, line }) => (
-              <tr key={line.id} className="hover:bg-zinc-50">
-                <Td><Link to={yearPath(filing)} className="font-medium hover:underline">{filing.entities.name}</Link><div className="text-xs capitalize text-zinc-500">{filing.tax_year} {filing.stage}</div></Td>
-                <Td><div className="font-medium">{line.department}</div><div className="text-xs text-zinc-500">{line.tax_type}</div></Td>
-                <Td className="font-medium tabular-nums">{money(line.amount)}</Td>
+              <Tr key={line.id}>
+                <Td><Link to={yearPath(filing)} className="block truncate font-medium hover:underline">{filing.entities.name}</Link><Sub>{filing.tax_year} {filing.stage}</Sub></Td>
+                <Td><div className="truncate">{line.department}</div><Sub>{line.tax_type}</Sub></Td>
+                <Td right className="font-medium tabular-nums">{money(line.amount)}</Td>
                 <Td>{method(line.new_method ?? line.method)}{(line.new_last4 ?? line.bank_last4) && <span className="text-zinc-500"> · •••• {line.new_last4 ?? line.bank_last4}</span>}</Td>
                 <Td className="tabular-nums">{date(line.payment_date)}</Td>
                 <Td>{needsManual(line) ? <Badge tone="red">Not paid</Badge> : line.client_paid_response === 'paid' ? <Badge tone="green">Paid</Badge> : <Badge>No response</Badge>}</Td>
-                <Td className="whitespace-nowrap text-right">
+                <Td right className="overflow-visible">
                   <span className="inline-flex gap-2">
-                    {needsManual(line) && <Button size="sm" disabled={busy === line.id} onClick={() => mark(line.id, 'manual_paid')}>Paid manually</Button>}
-                    <Button size="sm" variant="primary" disabled={busy === line.id} onClick={() => mark(line.id, 'verified')}>Verified on state site</Button>
+                    {needsManual(line) && <Button disabled={busy === line.id} onClick={() => mark(line.id, 'manual_paid')}>Paid manually</Button>}
+                    <Button variant="primary" disabled={busy === line.id} onClick={() => mark(line.id, 'verified')}>Verified on state site</Button>
                   </span>
                 </Td>
-              </tr>
+              </Tr>
             ))}
           </Table>
         )}

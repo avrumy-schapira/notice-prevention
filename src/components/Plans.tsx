@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { date, money } from '../lib/format'
 import { buildSchedule, DEPARTMENTS, penaltySavings, suggestTarget, type Frequency, type Schedule } from '../lib/plans'
-import { Badge, Button, Card, Empty, SectionTitle, Table, Td } from './ui'
+import { Badge, Button, Card, Empty, SectionTitle, Table, Td, Tr, control } from './ui'
 import { Field, inputCls, Modal } from './Modal'
 import { AddBankModal } from './BankInfo'
 
@@ -62,40 +62,39 @@ export function PlansList({ entityIds, entityId, showEntity }: { entityIds?: str
   const current = plans?.find((p) => p.id === open)
   return (
     <>
-      <SectionTitle right={entityId && <Button size="sm" variant="primary" onClick={() => setCreating(true)}><Plus className="h-3.5 w-3.5" />New payment plan</Button>}>Estimated payment plans</SectionTitle>
+      <SectionTitle right={entityId && <Button variant="primary" onClick={() => setCreating(true)}><Plus />New payment plan</Button>}>Estimated payment plans</SectionTitle>
       {!plans ? null : !plans.length ? (
         <Card><Empty title="No payment plans yet">{entityId ? 'Set one up after the season for each department the client pays estimates to.' : 'Open an entity to set up its plan.'}</Empty></Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {plans.map((p) => {
-            const pays = [...p.plan_payments].sort((a, b) => a.seq - b.seq)
-            const made = pays.filter((x) => x.status === 'made').length
-            const next = pays.find((x) => x.status === 'scheduled')
-            const late = pays.filter((x) => x.status === 'missed' || (x.status === 'scheduled' && x.due_date < today())).length
-            return (
-              <button key={p.id} onClick={() => setOpen(p.id)} className="text-left">
-                <Card className="p-5 transition hover:border-zinc-300 hover:shadow-md">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      {showEntity && <div className="mb-0.5 text-xs text-zinc-500">{p.entities?.name}</div>}
-                      <div className="font-semibold">{p.department} <span className="font-normal text-zinc-400">· {p.tax_year}</span></div>
-                      <div className="mt-0.5 text-sm text-zinc-500 capitalize">{p.frequency} · {WHO[p.who_pays]} pays{p.bank_accounts ? ` · •••• ${p.bank_accounts.last4}` : ''}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold tabular-nums">{money(p.target_amount)}</div>
+        <Card>
+          <Table cols={showEntity
+            ? [['Entity'], ['Department', '140px'], ['Year', '70px'], ['Total', '120px', 'right'], ['Schedule', '160px'], ['Paid', '170px'], ['Next payment', '210px']]
+            : [['Department'], ['Year', '80px'], ['Total', '130px', 'right'], ['Schedule', '170px'], ['Paid', '190px'], ['Next payment', '210px']]}>
+            {plans.map((p) => {
+              const pays = [...p.plan_payments].sort((a, b) => a.seq - b.seq)
+              const made = pays.filter((x) => x.status === 'made').length
+              const next = pays.find((x) => x.status === 'scheduled')
+              const late = pays.filter((x) => x.status === 'missed' || (x.status === 'scheduled' && x.due_date < today())).length
+              return (
+                <Tr key={p.id} onClick={() => setOpen(p.id)}>
+                  {showEntity && <Td className="font-medium">{p.entities?.name}</Td>}
+                  <Td className="font-medium">{p.department}</Td>
+                  <Td className="tabular-nums">{p.tax_year}</Td>
+                  <Td right className="font-medium tabular-nums">{money(p.target_amount)}</Td>
+                  <Td className="capitalize text-zinc-600">{p.frequency} · {WHO[p.who_pays]}</Td>
+                  <Td>
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-zinc-100"><div className="h-full bg-zinc-900" style={{ width: `${pays.length ? (made / pays.length) * 100 : 0}%` }} /></div>
+                      <span className="text-xs tabular-nums text-zinc-500">{made}/{pays.length}</span>
                       {late > 0 && <Badge tone="red">{late} late</Badge>}
                     </div>
-                  </div>
-                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-zinc-100"><div className="h-full rounded-full bg-zinc-900" style={{ width: `${pays.length ? (made / pays.length) * 100 : 0}%` }} /></div>
-                  <div className="mt-2 flex justify-between text-xs text-zinc-500">
-                    <span>{made} of {pays.length} paid</span>
-                    <span>{next ? `Next ${date(next.due_date)} · ${money(next.amount)}` : 'Complete'}</span>
-                  </div>
-                </Card>
-              </button>
-            )
-          })}
-        </div>
+                  </Td>
+                  <Td className="text-zinc-600">{next ? `${date(next.due_date)} · ${money(next.amount)}` : 'Complete'}</Td>
+                </Tr>
+              )
+            })}
+          </Table>
+        </Card>
       )}
       {current && <PlanModal plan={current} rate={rate} onClose={() => setOpen(null)} onChanged={load} />}
       {creating && entityId && <PlanEditor entityId={entityId} rate={rate} onClose={() => setCreating(false)} onSaved={load} />}
@@ -119,7 +118,8 @@ function PlanModal({ plan, rate, onClose, onChanged }: { plan: Plan; rate: numbe
 
   return (
     <Modal wide title={`${plan.department} · ${plan.tax_year} estimated payments`} onClose={onClose}>
-      <div className="mb-5 grid grid-cols-2 gap-4 rounded-xl bg-zinc-50 p-4 md:grid-cols-4">
+      <div className="-mx-6 -mt-6 mb-0" />
+      <div className="mb-5 grid grid-cols-4 gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
         <div><div className="text-xs text-zinc-500">Total</div><div className="font-semibold tabular-nums">{money(plan.target_amount)}</div></div>
         <div><div className="text-xs text-zinc-500">Schedule</div><div className="capitalize">{plan.frequency}, day {plan.pay_day}</div></div>
         <div><div className="text-xs text-zinc-500">Paid from</div><div>{plan.bank_accounts ? `•••• ${plan.bank_accounts.last4}` : '—'}</div></div>
@@ -129,33 +129,33 @@ function PlanModal({ plan, rate, onClose, onChanged }: { plan: Plan; rate: numbe
             <button onClick={toggleSavings} className="text-xs text-zinc-500 underline">{plan.show_savings ? 'shown to client' : 'hidden from client'}</button></div>
         </div>
       </div>
-      <Table head={['#', 'Date', 'Counts for', 'Amount', 'Who pays', 'Status', '']}>
+      <Table cols={[['#', '44px'], ['Date', '120px'], ['Counts for', '120px'], ['Amount', '110px', 'right'], ['Who pays', '130px'], ['Status', '110px'], ['', '', 'right']]}>
         {pays.map((p) => (
-          <tr key={p.id}>
+          <Tr key={p.id}>
             <Td className="text-zinc-400">{p.seq}</Td>
             <Td className="tabular-nums">{date(p.due_date)}</Td>
             <Td className="text-xs text-zinc-500">{date(p.installment_deadline)}</Td>
-            <Td className="font-medium tabular-nums">{money(p.amount)}</Td>
+            <Td right className="font-medium tabular-nums">{money(p.amount)}</Td>
             <Td>
               <select value={p.who_pays} onChange={(e) => setWho(p, e.target.value)} disabled={p.status !== 'scheduled'}
-                className="rounded-md border-0 bg-transparent py-1 pl-1 pr-6 text-sm ring-1 ring-inset ring-zinc-200 focus:ring-zinc-900">
+                className={`${control} w-full`}>
                 <option value="richelle">Richelle</option><option value="client">Client</option>
               </select>
             </Td>
             <Td>{paymentState(p)}</Td>
-            <Td className="whitespace-nowrap text-right">
+            <Td right className="overflow-visible">
               {p.status === 'scheduled' ? (
-                <span className="inline-flex gap-1">
-                  <Button size="sm" onClick={() => act(p, 'made')}><Check className="h-3.5 w-3.5" />Made</Button>
-                  {p.due_date <= today() && <Button size="sm" variant="ghost" onClick={() => act(p, 'missed')}><X className="h-3.5 w-3.5" />Missed</Button>}
+                <span className="inline-flex gap-2">
+                  {p.due_date <= today() && <Button onClick={() => act(p, 'missed')}><X />Missed</Button>}
+                  <Button onClick={() => act(p, 'made')}><Check />Made</Button>
                 </span>
-              ) : <button onClick={() => act(p, 'scheduled')} className="text-xs text-zinc-400 underline">Undo</button>}
+              ) : <Button variant="ghost" onClick={() => act(p, 'scheduled')}>Undo</Button>}
             </Td>
-          </tr>
+          </Tr>
         ))}
       </Table>
       <p className="mt-4 text-xs text-zinc-500">Reminder to the client 3 days before each payment, and an email to Richelle on days payments are due, start once the payments@ mailbox is connected.</p>
-      <div className="mt-6 flex justify-between"><Button variant="ghost" onClick={del}><Trash2 className="h-4 w-4" />Delete plan</Button><Button onClick={onClose}>Close</Button></div>
+      <div className="mt-6 flex justify-between"><Button variant="danger" onClick={del}><Trash2 />Delete plan</Button><Button onClick={onClose}>Close</Button></div>
     </Modal>
   )
 }
@@ -254,7 +254,7 @@ function PlanEditor({ entityId, rate, onClose, onSaved }: { entityId: string; ra
               </Field>}
         </div>
 
-        <div className="rounded-xl border border-zinc-200 p-4">
+        <div className="rounded-lg border border-zinc-200 p-4">
           <div className="mb-3 text-sm font-semibold">Last year’s return</div>
           <div className="grid grid-cols-3 gap-4">
             {money0(f.schedule === 'ptet' ? 'Last year’s PTET' : 'Last year’s tax', 'priorTax')}
@@ -272,7 +272,7 @@ function PlanEditor({ entityId, rate, onClose, onSaved }: { entityId: string; ra
           </div>
         </div>
 
-        <div className="rounded-xl bg-zinc-50 p-4">
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-xs font-medium text-zinc-500">Suggested total</div>
@@ -302,7 +302,7 @@ function PlanEditor({ entityId, rate, onClose, onSaved }: { entityId: string; ra
                 <option value="">{banks.length ? 'Choose…' : 'None saved'}</option>
                 {banks.map((b) => <option key={b.id} value={b.id}>{b.label ?? 'Account'} •••• {b.last4}</option>)}
               </select>
-              <button onClick={() => setAddingBank(true)} title="Add bank account" className="rounded-lg px-2 ring-1 ring-inset ring-zinc-300 hover:bg-zinc-50"><Plus className="h-4 w-4" /></button>
+              <button onClick={() => setAddingBank(true)} title="Add bank account" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-300 hover:bg-zinc-50"><Plus className="h-4 w-4" /></button>
             </div>
           </Field>
         </div>
@@ -315,14 +315,14 @@ function PlanEditor({ entityId, rate, onClose, onSaved }: { entityId: string; ra
               Show the client he saves <b className="tabular-nums text-emerald-700">{money(savings)}</b> in penalties
             </label>
           </div>
-          <div className="max-h-56 overflow-y-auto rounded-xl border border-zinc-200">
-            <Table head={['Date', 'Counts for', 'Amount']}>
+          <div className="max-h-64 overflow-y-auto rounded-lg border border-zinc-200">
+            <Table cols={[['Date'], ['Counts for', '160px'], ['Amount', '140px', 'right']]}>
               {schedule.map((p) => (
-                <tr key={p.seq} className={p.due_date < today() ? 'text-zinc-400' : ''}>
-                  <Td className="tabular-nums">{date(p.due_date)}{p.due_date < today() && <span className="ml-2 text-xs">past, mark made or missed</span>}</Td>
-                  <Td className="text-xs">{date(p.installment_deadline)}</Td>
-                  <Td className="font-medium tabular-nums">{money(p.amount)}</Td>
-                </tr>
+                <Tr key={p.seq} className={p.due_date < today() ? 'text-zinc-400' : ''}>
+                  <Td className="tabular-nums">{date(p.due_date)}{p.due_date < today() && <span className="ml-2 text-xs">already past</span>}</Td>
+                  <Td>{date(p.installment_deadline)}</Td>
+                  <Td right className="font-medium tabular-nums">{money(p.amount)}</Td>
+                </Tr>
               ))}
             </Table>
           </div>

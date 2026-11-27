@@ -13,6 +13,8 @@ import { Workload } from './pages/Workload'
 import { PendingApprovals } from './pages/PendingApprovals'
 import { PaymentConfirmations } from './pages/PaymentConfirmations'
 import { SearchPage } from './pages/SearchPage'
+import { UpcomingPayments } from './pages/UpcomingPayments'
+import { Settings } from './pages/Settings'
 
 // Old /filing/:id links -> year page
 function FilingRedirect() {
@@ -38,7 +40,10 @@ function Routed() {
         <Route path="/entity/:id" element={<EntityPage />} />
         <Route path="/entity/:id/:year" element={<YearPage />} />
         <Route path="/filing/:id" element={<FilingRedirect />} />
-        {profile.role !== 'staff' && <Route path="/workload" element={<Workload />} />}
+        {profile.role !== 'staff' && <Route path="/work" element={<Workload />} />}
+        <Route path="/workload" element={<Navigate to="/work" replace />} />
+        <Route path="/upcoming" element={<UpcomingPayments />} />
+        {profile.role === 'admin' && <Route path="/settings" element={<Settings />} />}
         <Route path="/approvals" element={<PendingApprovals />} />
         <Route path="/payments" element={<PaymentConfirmations />} />
         <Route path="/search" element={<SearchPage />} />

@@ -47,14 +47,18 @@ Deno.serve(async (req) => {
   const { data: role } = await asUser.rpc('my_role')
   if (!['admin', 'manager'].includes(role)) return json({ error: 'Only admin or manager can sync' }, 403)
 
+  const body = await req.json().catch(() => ({}))
   try {
+    // Read-only look at a Karbon list (used to map fields)
+    if (typeof body.probePath === 'string' && /^\/(WorkItems|Users|WorkTypes|TenantSettings)/.test(body.probePath)) return json(await kget(body.probePath))
+
     const started = Date.now()
     const [groups, contacts, orgs] = await Promise.all([kall('/ClientGroups'), kall('/Contacts'), kall('/Organizations')])
     const full = await pool(groups, 8, (g: any) => kget('/ClientGroups/' + g.ClientGroupKey))
 
     const now = new Date().toISOString()
     const { error: ge } = await db.from('client_groups').upsert(
-      full.map((g: any) => ({ karbon_key: g.ClientGroupKey, name: g.FullName ?? '(no name)', last_synced_at: now })),
+      full.map((g: any) => ({ karbon_key: g.ClientGroupKey, name: g.FullName ?? '(no name)', karbon_status: g.ContactType ?? null, last_synced_at: now })),
       { onConflict: 'karbon_key' })
     if (ge) throw ge
     const { data: gIds } = await db.from('client_groups').select('id, karbon_key')
@@ -78,6 +82,8 @@ Deno.serve(async (req) => {
           client_group_id: g ? gId.get(g.ClientGroupKey) ?? null : null,
           assigned_preparer: x.ClientManager ?? x.ClientOwner ?? g?.ClientManager ?? g?.ClientOwner ?? null,
           karbon_status: x.ContactType ?? null,
+          email: x.EmailAddress ?? null,
+          phone: x.PhoneNumber ?? null,
           last_synced_at: now,
         }
       })
@@ -87,7 +93,35 @@ Deno.serve(async (req) => {
       const { error } = await db.from('entities').upsert(rows.slice(i, i + 500), { onConflict: 'karbon_key' })
       if (error) throw error
     }
-    const result = { groups: full.length, entities: rows.length, seconds: Math.round((Date.now() - started) / 1000) }
+    // Work list: open tax-return work items assigned to the admin in Karbon
+    let work = 0
+    const { data: st } = await db.from('app_settings').select('value').eq('key', 'karbon_admin_email').maybeSingle()
+    if (st?.value) {
+      const items = await kall("/WorkItems?$filter=AssigneeEmailAddress eq '" + st.value + "'")
+      const open = items.filter((w: any) => w.PrimaryStatus !== 'Completed' && /^Tax:/.test(w.WorkType ?? '')
+        && /tax return/i.test(w.Title ?? '') && !/amended/i.test((w.WorkTemplateTile ?? '') + ' ' + (w.Title ?? '')))
+      const { data: eIds } = await db.from('entities').select('id, karbon_key, return_type')
+      const eMap = new Map((eIds ?? []).map((r) => [r.karbon_key, r]))
+      const rt = (t: string) => /1120S|S-Corp/i.test(t) ? '1120-S' : /1120/.test(t) ? '1120' : /1065/.test(t) ? '1065' : /1041/.test(t) ? '1041' : /990/.test(t) ? '990' : /1040/.test(t) ? '1040' : null
+      const wRows = open.map((w: any) => {
+        const years = (w.Title ?? '').match(/20\d\d/g)
+        return {
+          karbon_key: w.WorkItemKey, entity_id: eMap.get(w.ClientKey)?.id ?? null, title: w.Title, work_type: w.WorkType,
+          tax_year: years ? Number(years[years.length - 1]) : null, return_type: rt(w.WorkType ?? ''),
+          primary_status: w.PrimaryStatus, secondary_status: w.SecondaryStatus,
+          due_date: w.DueDate ? String(w.DueDate).slice(0, 10) : null, assignee_email: w.AssigneeEmailAddress, synced_at: now,
+        }
+      })
+      await db.from('karbon_work_items').delete().neq('karbon_key', '')
+      if (wRows.length) { const { error } = await db.from('karbon_work_items').insert(wRows); if (error) throw error }
+      for (const w of wRows) {
+        const e = w.entity_id && [...eMap.values()].find((x) => x.id === w.entity_id)
+        if (e && !e.return_type && w.return_type) await db.from('entities').update({ return_type: w.return_type }).eq('id', w.entity_id)
+      }
+      work = wRows.length
+    }
+
+    const result = { groups: full.length, entities: rows.length, work, seconds: Math.round((Date.now() - started) / 1000) }
     await db.from('activity_log').insert({ action: 'karbon_sync', details: result })
     return json({ ok: true, ...result })
   } catch (e) {

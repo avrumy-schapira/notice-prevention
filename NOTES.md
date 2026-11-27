@@ -31,6 +31,13 @@ Sign-in: email link (Google sign-in later). Supabase Site URL = https://notice-p
 - Pages: Admin workload, Pending approvals, Payment confirmations, Client database, entity page, filing page
 - Mark as filed, "Preparer approved in Karbon" on flags, payment check-offs, activity log
 
+## Also built (11/27, second pass, per Penalty_Prevention_Process_Overview.pdf)
+- Tabs: Clients, Work (Karbon work items assigned to admin@schapiracpa.com + filings), Client approvals, Payment confirmations, Upcoming payments, Settings (admin)
+- Only active Karbon clients shown (Inactive and Internal hidden; view client_group_list)
+- Client group tabs: Entities / Return payments / Payment plans / Banks & info. Entity tabs: Tax years / Payment plans / Banks & info
+- Bank accounts encrypted with a Vault key (bank_key) via save_bank_account / reveal_bank; every reveal logged in bank_reveals
+- Estimated payment plans (src/lib/plans.ts): safe-harbor suggestion (100/110%, NJ 100%, PTET 100% prior / 90% current / 120% starting), quarterly or monthly, business-day dates (federal holidays + DC Emancipation Day), late start, who pays per payment, penalty savings at app_settings.underpayment_rate (7% Q4 2026)
+
 ## Not built yet
 1. Nightly Karbon sync (the Sync Karbon button on Clients works now)
 2. Data mining import → prior_year_amounts

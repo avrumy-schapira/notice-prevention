@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Check, CircleDashed, Download, Eye, Mail, Send, Upload } from 'lucide-react'
+import { AlertTriangle, Check, CircleDashed, Download, Mail, Send, Upload } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { date, dateTime, method, money } from '../lib/format'
 import { FILING_SELECT, type Filing, type PaymentLine } from '../lib/types'
 import { Badge, Button, Card, Empty, Loading, SectionTitle, StatusBadge, Table, Td } from './ui'
+import { BankReveal } from './BankReveal'
 
 type Flag = { id: string; check_code: string; message: string; status: string; preparer_name: string | null; approved_at: string | null }
 type Log = { id: number; action: string; details: Record<string, unknown> | null; created_at: string; profiles: { email: string } | null }
@@ -133,7 +134,8 @@ export function FilingPanel({ filingId }: { filingId: string }) {
                   <Td><div className="font-medium">{l.department}</div><div className="text-xs text-zinc-500">{l.tax_type}{l.owner ? ` · ${l.owner === 'T' ? 'Taxpayer' : 'Spouse'}` : ''}</div></Td>
                   <Td className="font-medium tabular-nums">{money(l.amount)}</Td>
                   <Td>{l.method === 'efw' ? method(l.method) : <Badge tone="red">{method(l.method)}</Badge>}</Td>
-                  <Td>{l.bank_last4 ? <span className="inline-flex items-center gap-1.5 tabular-nums">•••• {l.bank_last4}<button disabled title="Reveal / Copy comes with bank encryption" className="text-zinc-300"><Eye className="h-3.5 w-3.5" /></button></span> : '—'}</Td>
+                  <Td>{l.bank_last4 ? <div className="space-y-0.5 text-xs"><BankReveal kind="payment_line" id={l.id} field="routing" label="Rtg" /><br /><BankReveal kind="payment_line" id={l.id} field="account" last4={l.bank_last4} label="Acct" /></div> : '—'}
+                    {l.new_last4 && <div className="mt-1 text-xs text-amber-700"><BankReveal kind="payment_line" id={l.id} field="new_account" last4={l.new_last4} label="New" /></div>}</Td>
                   <Td className="tabular-nums">{date(l.payment_date)}</Td>
                   <Td>{clientResponse(l)}</Td>
                   <Td>{paymentStatus(l)}</Td>
@@ -153,7 +155,7 @@ export function FilingPanel({ filingId }: { filingId: string }) {
                 <tr key={l.id}>
                   <Td><div className="font-medium">{l.department}</div><div className="text-xs text-zinc-500">{l.tax_type}</div></Td>
                   <Td className="font-medium tabular-nums text-emerald-700">{money(l.amount)}</Td>
-                  <Td>{l.bank_last4 ? `•••• ${l.bank_last4}` : '—'}</Td>
+                  <Td>{l.bank_last4 ? <BankReveal kind="payment_line" id={l.id} field="account" last4={l.bank_last4} /> : '—'}</Td>
                   <Td>{clientResponse(l)}</Td>
                 </tr>
               ))}

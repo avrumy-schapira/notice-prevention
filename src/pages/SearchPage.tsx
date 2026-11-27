@@ -16,9 +16,9 @@ export function SearchPage() {
     setRes(null)
     const like = `%${q.replace(/[%_,()]/g, ' ')}%`
     Promise.all([
-      supabase.from('client_groups').select('id, name').ilike('name', like).order('name').limit(20),
+      supabase.from('client_group_list').select('id, name').ilike('name', like).order('name').limit(20),
       supabase.from('entities').select('id, name, client_id, client_groups(name), filings(tax_year, stage, status)')
-        .or(`name.ilike.${like},client_id.ilike.${like}`).order('name').limit(50),
+        .or(`name.ilike.${like},client_id.ilike.${like}`).or('karbon_status.is.null,karbon_status.not.in.(Inactive,Internal)').order('name').limit(50),
     ]).then(([g, e]) => setRes({ groups: (g.data as G[]) ?? [], ents: (e.data as unknown as E[]) ?? [] }))
   }, [q])
 

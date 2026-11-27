@@ -7,7 +7,7 @@ import { lastSync, syncKarbon } from '../lib/karbon'
 import { dateTime } from '../lib/format'
 import { Button, Card, Empty, Loading, PageHeader, SearchBox } from '../components/ui'
 
-type G = { id: string; name: string; entities: { count: number }[] }
+type G = { id: string; name: string; entity_count: number }
 
 export function ClientsPage() {
   const { profile } = useAuth()
@@ -21,8 +21,8 @@ export function ClientsPage() {
 
   const load = useCallback(async () => {
     const [{ data }, { count }, last] = await Promise.all([
-      supabase.from('client_groups').select('id, name, entities(count)').order('name'),
-      supabase.from('entities').select('id', { count: 'exact', head: true }).is('client_group_id', null),
+      supabase.from('client_group_list').select('id, name, entity_count').order('name'),
+      supabase.from('entities').select('id', { count: 'exact', head: true }).is('client_group_id', null).or('karbon_status.is.null,karbon_status.not.in.(Inactive,Internal)'),
       lastSync(),
     ])
     setGroups((data as G[]) ?? [])
@@ -47,7 +47,7 @@ export function ClientsPage() {
     <>
       <PageHeader
         title="Clients"
-        sub={`${groups?.length ?? '…'} client groups from Karbon${synced ? ` · last synced ${dateTime(synced)}` : ''}`}
+        sub={`${groups?.length ?? '…'} active client groups from Karbon${synced ? ` · last synced ${dateTime(synced)}` : ''}`}
         right={<>
           <SearchBox value={q} onChange={setQ} placeholder="Search client groups" />
           {canSync && <Button onClick={sync} disabled={syncing}><RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />{syncing ? 'Syncing…' : 'Sync Karbon'}</Button>}
@@ -65,7 +65,7 @@ export function ClientsPage() {
                     {g.name.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 font-medium text-zinc-900">{g.name}</div>
-                  <div className="flex items-center gap-1.5 text-sm text-zinc-500"><Users className="h-4 w-4" />{g.entities[0]?.count ?? 0}</div>
+                  <div className="flex items-center gap-1.5 text-sm text-zinc-500"><Users className="h-4 w-4" />{g.entity_count}</div>
                   <ChevronRight className="h-4 w-4 text-zinc-300 transition group-hover:text-zinc-500" />
                 </Link>
               </li>

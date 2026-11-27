@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { Building2, ClipboardList, Hourglass, BadgeCheck, LogOut, Search } from 'lucide-react'
+import { Building2, ClipboardList, Hourglass, BadgeCheck, CalendarClock, LogOut, Search, Settings } from 'lucide-react'
 import { signOut, useAuth } from '../lib/auth'
 
 export function Layout() {
@@ -39,9 +39,11 @@ export function Layout() {
 
           <div className="mt-6 px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Work</div>
           <div className="space-y-0.5">
-            {canSeeWorkload && <NavLink to="/workload" className={small}><ClipboardList className="h-4 w-4" /> Admin workload</NavLink>}
-            <NavLink to="/approvals" className={small}><Hourglass className="h-4 w-4" /> Pending approvals</NavLink>
+            {canSeeWorkload && <NavLink to="/work" className={small}><ClipboardList className="h-4 w-4" /> Work</NavLink>}
+            <NavLink to="/approvals" className={small}><Hourglass className="h-4 w-4" /> Client approvals</NavLink>
             <NavLink to="/payments" className={small}><BadgeCheck className="h-4 w-4" /> Payment confirmations</NavLink>
+            <NavLink to="/upcoming" className={small}><CalendarClock className="h-4 w-4" /> Upcoming payments</NavLink>
+            {profile?.role === 'admin' && <NavLink to="/settings" className={small}><Settings className="h-4 w-4" /> Settings</NavLink>}
           </div>
         </nav>
 

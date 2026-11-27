@@ -19,7 +19,7 @@ export function PendingApprovals() {
 
   return (
     <>
-      <PageHeader title="Pending approvals" sub="Emailed to the client, not filed yet" />
+      <PageHeader title="Client approvals" sub="Emails sent before filing, and whether the client answered" />
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
       <Filters filings={filings} value={flt} onChange={setFlt} statuses={SHOWN} />
       <Card>

@@ -32,7 +32,7 @@ Sign-in: email link (Google sign-in later). Supabase Site URL = https://notice-p
 - Mark as filed, "Preparer approved in Karbon" on flags, payment check-offs, activity log
 
 ## Also built (11/27, second pass, per Penalty_Prevention_Process_Overview.pdf)
-- Tabs: Clients, Work (Karbon work items assigned to admin@schapiracpa.com + filings), Client approvals, Payment confirmations, Upcoming payments, Settings (admin)
+- Tabs: Clients, Work (Karbon tax work items from "Send Return to Client" / "Ext - Send to Client" or a later filing status until Completed; extension vs return from the status; PTET and amended excluded), Client approvals, Payment confirmations, Upcoming payments, Settings (admin)
 - Only active Karbon clients shown (Inactive and Internal hidden; view client_group_list)
 - Client group tabs: Entities / Return payments / Payment plans / Banks & info. Entity tabs: Tax years / Payment plans / Banks & info
 - Bank accounts encrypted with a Vault key (bank_key) via save_bank_account / reveal_bank; every reveal logged in bank_reveals

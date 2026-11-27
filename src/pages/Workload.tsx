@@ -13,7 +13,7 @@ import { yearPath, type Filing, type FilingStatus } from '../lib/types'
 const PART1: FilingStatus[] = ['not_started', 'pulled_flags_open', 'ready_to_email']
 const PART2: FilingStatus[] = ['emailed_waiting', 'client_confirmed', 'client_modified_ach', 'client_modified_method']
 
-type W = { karbon_key: string; title: string; work_type: string | null; tax_year: number | null; return_type: string | null; primary_status: string | null; secondary_status: string | null; due_date: string | null; entity_id: string | null; entities: { name: string; client_groups: { name: string } | null } | null }
+type W = { karbon_key: string; stage: 'extension' | 'return' | null; title: string; work_type: string | null; tax_year: number | null; return_type: string | null; primary_status: string | null; secondary_status: string | null; due_date: string | null; entity_id: string | null; entities: { name: string; client_groups: { name: string } | null } | null }
 
 function Rows({ rows }: { rows: Filing[] }) {
   const nav = useNavigate()
@@ -44,7 +44,7 @@ export function Workload() {
   const [syncing, setSyncing] = useState(false)
 
   const loadWork = useCallback(async () => {
-    const { data } = await supabase.from('karbon_work_items').select('*, entities(name, client_groups(name))').order('due_date')
+    const { data } = await supabase.from('karbon_work_items').select('*, entities(name, client_groups(name))').order('first_seen_at')
     setWork((data as W[]) ?? [])
   }, [])
   useEffect(() => { loadWork() }, [loadWork])
@@ -60,8 +60,8 @@ export function Workload() {
     nav(`/entity/${w.entity_id}/${w.tax_year}?stage=${stage}`)
   }
 
-  const started = new Set(filings.map((x) => `${x.entities.id}|${x.tax_year}`))
-  const newWork = (work ?? []).filter((w) => !(w.entity_id && started.has(`${w.entity_id}|${w.tax_year}`)))
+  const started = new Set(filings.map((x) => `${x.entities.id}|${x.tax_year}|${x.stage}`))
+  const newWork = (work ?? []).filter((w) => !(w.entity_id && started.has(`${w.entity_id}|${w.tax_year}|${w.stage}`)))
   const rows = applyFilters(filings, f)
 
   return (
@@ -69,24 +69,19 @@ export function Workload() {
       <PageHeader title="Work" sub="Returns to check, email and file"
         right={<Button onClick={sync} disabled={syncing}><RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />Refresh from Karbon</Button>} />
 
-      <SectionTitle right={<span className="text-xs text-zinc-500">Assigned to the admin in Karbon</span>}>New from Karbon {newWork.length > 0 && <Badge tone="blue">{newWork.length}</Badge>}</SectionTitle>
+      <SectionTitle right={<span className="text-xs text-zinc-500">From “Send Return / Ext to Client” in Karbon until Completed</span>}>New from Karbon {newWork.length > 0 && <Badge tone="blue">{newWork.length}</Badge>}</SectionTitle>
       <Card className="mb-8">
-        {!work ? <Loading /> : !newWork.length ? <Empty title="Nothing new assigned" /> : (
-          <Table head={['Client', 'Karbon work', 'Tax year', 'Status in Karbon', 'Due', '']}>
+        {!work ? <Loading /> : !newWork.length ? <Empty title="Nothing new from Karbon" /> : (
+          <Table head={['Client', 'Karbon work', 'Tax year', 'Type', 'Status in Karbon', '']}>
             {newWork.map((w) => (
               <tr key={w.karbon_key}>
                 <Td><div className="font-medium">{w.entities?.name ?? <span className="text-red-600">Not matched to a client</span>}</div><div className="text-xs text-zinc-500">{w.entities?.client_groups?.name}</div></Td>
                 <Td><div className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-zinc-400" />{w.title}</div><div className="text-xs text-zinc-500">{w.work_type}</div></Td>
                 <Td className="tabular-nums">{w.tax_year ?? '—'}</Td>
-                <Td className="text-xs text-zinc-600">{w.primary_status}{w.secondary_status ? ` · ${w.secondary_status}` : ''}</Td>
-                <Td className="text-zinc-600">{date(w.due_date)}</Td>
+                <Td><Badge tone={w.stage === 'extension' ? 'violet' : 'blue'}>{w.stage === 'extension' ? 'Extension' : 'Return'}</Badge></Td>
+                <Td className="text-xs text-zinc-600">{w.secondary_status ?? w.primary_status}</Td>
                 <Td className="whitespace-nowrap text-right">
-                  {isAdmin && w.entity_id && w.tax_year ? (
-                    <span className="inline-flex gap-2">
-                      <Button size="sm" onClick={() => open(w, 'extension')}>Extension</Button>
-                      <Button size="sm" variant="primary" onClick={() => open(w, 'return')}>Return</Button>
-                    </span>
-                  ) : null}
+                  {isAdmin && w.entity_id && w.tax_year ? <Button size="sm" variant="primary" onClick={() => open(w, w.stage ?? 'return')}>Open</Button> : null}
                 </Td>
               </tr>
             ))}

@@ -93,33 +93,36 @@ Deno.serve(async (req) => {
       const { error } = await db.from('entities').upsert(rows.slice(i, i + 500), { onConflict: 'karbon_key' })
       if (error) throw error
     }
-    // Work list: open tax-return work items assigned to the admin in Karbon
-    let work = 0
-    const { data: st } = await db.from('app_settings').select('value').eq('key', 'karbon_admin_email').maybeSingle()
-    if (st?.value) {
-      const items = await kall("/WorkItems?$filter=AssigneeEmailAddress eq '" + st.value + "'")
-      const open = items.filter((w: any) => w.PrimaryStatus !== 'Completed' && /^Tax:/.test(w.WorkType ?? '')
-        && /tax return/i.test(w.Title ?? '') && !/amended/i.test((w.WorkTemplateTile ?? '') + ' ' + (w.Title ?? '')))
-      const { data: eIds } = await db.from('entities').select('id, karbon_key, return_type')
-      const eMap = new Map((eIds ?? []).map((r) => [r.karbon_key, r]))
-      const rt = (t: string) => /1120S|S-Corp/i.test(t) ? '1120-S' : /1120/.test(t) ? '1120' : /1065/.test(t) ? '1065' : /1041/.test(t) ? '1041' : /990/.test(t) ? '990' : /1040/.test(t) ? '1040' : null
-      const wRows = open.map((w: any) => {
-        const years = (w.Title ?? '').match(/20\d\d/g)
-        return {
-          karbon_key: w.WorkItemKey, entity_id: eMap.get(w.ClientKey)?.id ?? null, title: w.Title, work_type: w.WorkType,
-          tax_year: years ? Number(years[years.length - 1]) : null, return_type: rt(w.WorkType ?? ''),
-          primary_status: w.PrimaryStatus, secondary_status: w.SecondaryStatus,
-          due_date: w.DueDate ? String(w.DueDate).slice(0, 10) : null, assignee_email: w.AssigneeEmailAddress, synced_at: now,
-        }
-      })
-      await db.from('karbon_work_items').delete().neq('karbon_key', '')
-      if (wRows.length) { const { error } = await db.from('karbon_work_items').insert(wRows); if (error) throw error }
-      for (const w of wRows) {
-        const e = w.entity_id && [...eMap.values()].find((x) => x.id === w.entity_id)
-        if (e && !e.return_type && w.return_type) await db.from('entities').update({ return_type: w.return_type }).eq('id', w.entity_id)
+    // Work list: tax work items enter at "Send Return to Client" / "Ext - Send to Client" (or a later filing step)
+    // and stay until Completed in Karbon. Extension vs return comes from the Karbon status.
+    const EXT = ['Ext - Send to Client', 'Send Ext to Client', 'Ext-Waiting for Signature', 'Extension- Awaiting Sig.', 'Extension - Ready to File', 'File Extension', 'Ext - Waiting for IRS', 'Ext-Waiting for Conf', 'Ext - Rejected']
+    const RTN = ['Send Return to Client', 'Send Rtn to Client', 'Rtn - Waiting for Sig', 'Waiting for Client Sig', 'Obtain Return Filing Auth', 'Send Docusign', 'File Return', 'Rtn- Waiting for IRS', 'Send Confirmation', 'Send Conf to client', 'Waiting for confirmation']
+    const items = (await kall("/WorkItems?$filter=contains(WorkType,'Tax:')")).filter((w: any) => !/amended|ptet/i.test((w.WorkTemplateTile ?? '') + ' ' + (w.Title ?? '')))
+    const { data: prev } = await db.from('karbon_work_items').select('karbon_key, stage, first_seen_at')
+    const prevMap = new Map((prev ?? []).map((r) => [r.karbon_key, r]))
+    const { data: eIds } = await db.from('entities').select('id, karbon_key, return_type')
+    const eMap = new Map((eIds ?? []).map((r) => [r.karbon_key, r]))
+    const rt = (t: string) => /1120S|S-Corp/i.test(t) ? '1120-S' : /1120/.test(t) ? '1120' : /1065/.test(t) ? '1065' : /1041/.test(t) ? '1041' : /990/.test(t) ? '990' : /1040/.test(t) ? '1040' : null
+    const keep = items.filter((w: any) => w.PrimaryStatus !== 'Completed' && (EXT.includes(w.SecondaryStatus) || RTN.includes(w.SecondaryStatus) || prevMap.has(w.WorkItemKey)))
+    const wRows = keep.map((w: any) => {
+      const years = (w.Title ?? '').match(/20\d\d/g)
+      const p = prevMap.get(w.WorkItemKey)
+      return {
+        karbon_key: w.WorkItemKey, entity_id: eMap.get(w.ClientKey)?.id ?? null, title: w.Title, work_type: w.WorkType,
+        tax_year: years ? Number(years[years.length - 1]) : null, return_type: rt(w.WorkType ?? ''),
+        stage: EXT.includes(w.SecondaryStatus) ? 'extension' : RTN.includes(w.SecondaryStatus) ? 'return' : (p?.stage ?? 'return'),
+        primary_status: w.PrimaryStatus, secondary_status: w.SecondaryStatus,
+        due_date: w.DueDate ? String(w.DueDate).slice(0, 10) : null, assignee_email: w.AssigneeEmailAddress,
+        first_seen_at: p?.first_seen_at ?? now, synced_at: now,
       }
-      work = wRows.length
+    })
+    await db.from('karbon_work_items').delete().neq('karbon_key', '')
+    if (wRows.length) { const { error } = await db.from('karbon_work_items').insert(wRows); if (error) throw error }
+    for (const w of wRows) {
+      const e = w.entity_id ? [...eMap.values()].find((x) => x.id === w.entity_id) : null
+      if (e && !e.return_type && w.return_type) await db.from('entities').update({ return_type: w.return_type }).eq('id', w.entity_id)
     }
+    const work = wRows.length
 
     const result = { groups: full.length, entities: rows.length, work, seconds: Math.round((Date.now() - started) / 1000) }
     await db.from('activity_log').insert({ action: 'karbon_sync', details: result })

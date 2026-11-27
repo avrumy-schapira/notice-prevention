@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Check, Download, Mail, Send, Upload } from 'lucide-react'
+import { AlertTriangle, Check, Download, Loader2, Mail, RefreshCw, Send, Upload } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { date, dateTime, method, money } from '../lib/format'
@@ -8,6 +8,10 @@ import { Badge, Button, Card, Empty, Loading, SectionTitle, StatusBadge, Sub, Ta
 import { BankReveal } from './BankReveal'
 
 type Flag = { id: string; check_code: string; message: string; status: string; preparer_name: string | null; approved_at: string | null }
+type Job = { id: number; kind: string; status: 'waiting' | 'running' | 'done' | 'error'; error: string | null; created_at: string; finished_at: string | null }
+type FBank = { id: string; department: string; screen: string | null; account_type: string | null; last4: string | null }
+const AGENT_TYPES = ['1040', '1065', '1120', '1120-S', '1041']
+
 type Log = { id: number; action: string; details: Record<string, unknown> | null; created_at: string; profiles: { email: string } | null }
 
 const clientResponse = (l: PaymentLine) =>
@@ -30,6 +34,9 @@ export function FilingPanel({ filingId }: { filingId: string }) {
   const [f, setF] = useState<Filing | null>(null)
   const [flags, setFlags] = useState<Flag[]>([])
   const [log, setLog] = useState<Log[]>([])
+  const [job, setJob] = useState<Job | null>(null)
+  const [banks, setBanks] = useState<FBank[]>([])
+  const [agentSeen, setAgentSeen] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const [a, b, c] = await Promise.all([
@@ -38,8 +45,18 @@ export function FilingPanel({ filingId }: { filingId: string }) {
       supabase.from('activity_log').select('id, action, details, created_at, profiles(email)').eq('filing_id', filingId).order('created_at', { ascending: false }),
     ])
     setF(a.data as unknown as Filing); setFlags((b.data as Flag[]) ?? []); setLog((c.data as unknown as Log[]) ?? [])
+    const [j, fb, ag] = await Promise.all([
+      supabase.from('agent_jobs').select('id, kind, status, error, created_at, finished_at').eq('filing_id', filingId).order('id', { ascending: false }).limit(1),
+      supabase.from('filing_banks').select('id, department, screen, account_type, last4').eq('filing_id', filingId).order('department'),
+      supabase.rpc('agent_last_seen'),
+    ])
+    setJob(((j.data as Job[]) ?? [])[0] ?? null); setBanks((fb.data as FBank[]) ?? []); setAgentSeen((ag.data as { last_seen: string | null } | null)?.last_seen ?? null)
   }, [filingId])
   useEffect(() => { load() }, [load])
+
+  // While a job is waiting or running, check every 3 seconds
+  const active = job && (job.status === 'waiting' || job.status === 'running')
+  useEffect(() => { if (!active) return; const t = setInterval(load, 3000); return () => clearInterval(t) }, [active, load])
 
   const logAction = (action: string, details: object) =>
     supabase.from('activity_log').insert({ filing_id: filingId, entity_id: f?.entities.id, actor: session?.user.id, action, details })
@@ -51,6 +68,16 @@ export function FilingPanel({ filingId }: { filingId: string }) {
     if (error) return alert(error.message)
     await logAction('preparer_approved_in_karbon', { check: flag.check_code, preparer }); load()
   }
+  const pull = async (kind: 'pull' | 'final_pull') => {
+    const e = f!.entities
+    if (!e.client_id || e.client_id.includes(' - ')) return alert('This entity has no UltraTax client ID.')
+    if (!e.return_type || !AGENT_TYPES.includes(e.return_type)) return alert(`The agent can’t pull a ${e.return_type ?? 'unknown'} return.`)
+    const { error } = await supabase.from('agent_jobs').insert({ filing_id: filingId, client_id: e.client_id, return_type: e.return_type, stage: f!.stage, kind })
+    if (error) return alert(error.message.includes('agent_jobs_one_active') ? 'A pull is already in progress.' : error.message)
+    await logAction(kind === 'final_pull' ? 'final_pull_requested' : 'pull_requested', {})
+    load()
+  }
+
   const markFiled = async () => {
     if (!confirm('Mark as filed? The client link stops working and nothing can be changed after.')) return
     const now = new Date().toISOString()
@@ -73,13 +100,25 @@ export function FilingPanel({ filingId }: { filingId: string }) {
           <StatusBadge status={f.status} />
           {isAdmin && !filed && (
             <div className="flex gap-2">
-              <Button disabled title="Connects when the UltraTax agent is linked"><Download />Pull</Button>
+              {f.status === 'client_confirmed'
+                ? <Button disabled={!!active} onClick={() => pull('final_pull')}><Download />Final pull</Button>
+                : <Button disabled={!!active} onClick={() => pull('pull')}>{f.last_pull_at ? <RefreshCw /> : <Download />}{f.last_pull_at ? 'Update' : 'Pull'}</Button>}
               <Button disabled={open.length > 0 || !f.last_pull_at} title={open.length ? 'Clear open flags first' : 'Coming next'}><Mail />Email client</Button>
-              <Button disabled title="Connects when the UltraTax agent is linked"><Upload />Enter in UltraTax</Button>
+              <Button disabled title="Comes with the client page"><Upload />Enter in UltraTax</Button>
               <Button variant="primary" onClick={markFiled}><Send />Mark as filed</Button>
             </div>
           )}
         </div>
+        {job && job.status !== 'done' && (
+          <div className={`flex h-11 items-center gap-2 border-b px-5 text-sm ${job.status === 'error' ? 'border-red-100 bg-red-50 text-red-700' : 'border-zinc-100 bg-zinc-50 text-zinc-700'}`}>
+            {job.status === 'error' ? <AlertTriangle className="h-4 w-4" /> : <Loader2 className="h-4 w-4 animate-spin" />}
+            {job.status === 'waiting' && (agentSeen && Date.now() - new Date(agentSeen).getTime() < 120_000
+              ? 'Waiting for the agent to pick this up…'
+              : 'Waiting for the agent. It isn’t running right now. Start it on the admin computer with UltraTax open.')}
+            {job.status === 'running' && 'Pulling from UltraTax… this takes about 30–45 seconds.'}
+            {job.status === 'error' && <>Pull failed: {job.error}</>}
+          </div>
+        )}
         <ol className="grid grid-cols-5">
           {STEPS.map((label, i) => (
             <li key={label} className="flex items-center gap-3 border-r border-zinc-100 px-5 py-4 last:border-r-0">
@@ -110,6 +149,25 @@ export function FilingPanel({ filingId }: { filingId: string }) {
                 </li>
               ))}
             </ul>
+          </Card>
+        </section>
+      )}
+
+      {banks.length > 0 && (
+        <section>
+          <SectionTitle>Bank accounts in UltraTax</SectionTitle>
+          <Card>
+            <Table cols={[['Department', '160px'], ['Screen', '140px'], ['Routing'], ['Account'], ['Type', '110px']]}>
+              {banks.map((b) => (
+                <Tr key={b.id}>
+                  <Td className="font-medium">{b.department}</Td>
+                  <Td className="text-zinc-600">{b.screen}</Td>
+                  <Td><BankReveal kind="filing_bank" id={b.id} field="routing" /></Td>
+                  <Td><BankReveal kind="filing_bank" id={b.id} field="account" last4={b.last4} /></Td>
+                  <Td className="capitalize text-zinc-600">{b.account_type ?? '—'}</Td>
+                </Tr>
+              ))}
+            </Table>
           </Card>
         </section>
       )}

@@ -3,7 +3,7 @@ import { Check, Copy, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 // Shows •••• last4; Reveal / Copy fetch the full number (every reveal is logged)
-export function BankReveal({ kind, id, field, last4, label }: { kind: 'bank_account' | 'payment_line'; id: string; field: string; last4?: string | null; label?: string }) {
+export function BankReveal({ kind, id, field, last4, label }: { kind: 'bank_account' | 'payment_line' | 'filing_bank'; id: string; field: string; last4?: string | null; label?: string }) {
   const [full, setFull] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   useEffect(() => { if (!full) return; const t = setTimeout(() => setFull(null), 30_000); return () => clearTimeout(t) }, [full])

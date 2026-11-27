@@ -38,6 +38,12 @@ Sign-in: email link (Google sign-in later). Supabase Site URL = https://notice-p
 - Bank accounts encrypted with a Vault key (bank_key) via save_bank_account / reveal_bank; every reveal logged in bank_reveals
 - Estimated payment plans (src/lib/plans.ts): safe-harbor suggestion (100/110%, NJ 100%, PTET 100% prior / 90% current / 120% starting), quarterly or monthly, business-day dates (federal holidays + DC Emancipation Day), late start, who pays per payment, penalty savings at app_settings.underpayment_rate (7% Q4 2026)
 
+## UltraTax agent (0008, 0009)
+- Agent calls only agent_heartbeat / agent_claim_job / agent_finish_job with the publishable (anon) key + agent secret (bcrypt hash in agent_state; set with `select agent_new_secret();` in SQL editor)
+- Site: Pull / Update / Final pull on the year page create agent_jobs rows (admin only, one active job per filing); page polls every 3s
+- finish: raw result stored with bank numbers masked; full numbers encrypted in filing_banks; filings.last_pull_at, states_filed, diagnostics set
+- NEXT: map result into payment_lines + run Check Rules (build against Payment System\Agent\Pull Results samples)
+
 ## Not built yet
 1. Nightly Karbon sync (the Sync Karbon button on Clients works now)
 2. Data mining import → prior_year_amounts
